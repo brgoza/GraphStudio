@@ -1,0 +1,176 @@
+﻿@rendermode InteractiveServer
+@using System.Drawing
+@using GraphStudio.Domain
+@using System.Text.Json
+
+<div class="p-2 border rounded">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="fw-semibold">Edge Type</div>
+        <div class="d-flex gap-2">
+            @if (!IsDefault)
+            {
+                <button class="btn btn-sm btn-outline-primary" @onclick="() => OnMakeDefault.InvokeAsync(_draft.Id)">
+                    Make Default
+                </button>
+            }
+            <button class="btn btn-sm btn-danger" @onclick="Delete">Delete</button>
+        </div>
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Name</label>
+        <input class="form-control form-control-sm" @bind="_name" @bind:event="oninput" />
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Default Label</label>
+        <input class="form-control form-control-sm" @bind="_defaultLabel" @bind:event="oninput" />
+    </div>
+
+    <div class="form-check mb-1">
+        <input class="form-check-input" type="checkbox" @bind="_isDirected" />
+        <label class="form-check-label">Directed</label>
+    </div>
+
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" @bind="_isWeighted" />
+        <label class="form-check-label">Weighted</label>
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Curve Style</label>
+        <select class="form-select form-select-sm" @bind="_curveStyle">
+            @foreach (var cs in Enum.GetValues<CurveStyle>())
+            {
+                <option value="@cs">@cs</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Color</label>
+        <input class="form-control form-control-sm" @bind="_colorHex" />
+    </div>
+
+    <hr />
+
+    <div class="fw-semibold mb-1">Allowed Properties</div>
+    <div class="d-flex gap-2 mb-2">
+        <input class="form-control form-control-sm" placeholder="propertyKey" @bind="_newAllowed" @bind:event="oninput" />
+        <button class="btn btn-sm btn-outline-secondary" @onclick="AddAllowed">Add</button>
+    </div>
+
+    <div class="fw-semibold mb-1">Required Properties</div>
+    <div class="d-flex gap-2 mb-2">
+        <input class="form-control form-control-sm" placeholder="propertyKey" @bind="_newRequired" @bind:event="oninput" />
+        <button class="btn btn-sm btn-outline-secondary" @onclick="AddRequired">Add</button>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-primary" @onclick="Save" disabled="@(!_dirty)">Save</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Reset" disabled="@(!_dirty)">Revert</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public EdgeType EdgeType { get; set; } = default!;
+    [Parameter] public bool IsDefault { get; set; }
+
+    [Parameter, EditorRequired] public EventCallback<Guid> OnMakeDefault { get; set; }
+    [Parameter, EditorRequired] public EventCallback<EdgeType> OnSave { get; set; }
+    [Parameter, EditorRequired] public EventCallback<Guid> OnDelete { get; set; }
+
+    private EdgeType _draft = default!;
+    private string _name = "";
+    private string _defaultLabel = "";
+    private bool _isWeighted;
+    private bool _isDirected;
+
+    private CurveStyle _curveStyle;
+    private string _colorHex = "#9ca3af";
+
+    private HashSet<string> _allowed = new();
+    private HashSet<string> _required = new();
+
+    private string _newAllowed = "";
+    private string _newRequired = "";
+    private bool _dirty;
+
+    protected override void OnParametersSet()
+    {
+        _draft = EdgeType;
+
+        _name = EdgeType.Name;
+        _defaultLabel = EdgeType.DefaultLabel;
+        _isWeighted = EdgeType.IsWeighted;
+        _isDirected = EdgeType.IsDirected;
+
+        _curveStyle = EdgeType.Style.CurveStyle;
+        _colorHex = ToHex(EdgeType.Style.Color);
+
+        _allowed = new HashSet<string>(EdgeType.AllowedProperties);
+        _required = new HashSet<string>(EdgeType.RequiredProperties);
+
+        _dirty = false;
+    }
+
+    private async Task Save()
+    {
+        var updated = _draft with
+        {
+            Name = _name.Trim(),
+            DefaultLabel = _defaultLabel.Trim(),
+            IsWeighted = _isWeighted,
+            IsDirected = _isDirected,
+            AllowedProperties = new HashSet<string>(_allowed),
+            RequiredProperties = new HashSet<string>(_required),
+            Style = new EdgeStyle(
+                CurveStyle: _curveStyle,
+                Color: FromHex(_colorHex)
+            )
+        };
+
+        await OnSave.InvokeAsync(updated);
+        _dirty = false;
+    }
+
+    private void Reset() => OnParametersSet();
+    private async Task Delete() => await OnDelete.InvokeAsync(_draft.Id);
+
+    private void AddAllowed()
+    {
+        var key = (_newAllowed ?? "").Trim();
+        if (key.Length == 0) return;
+        if (_allowed.Add(key)) _dirty = true;
+        _newAllowed = "";
+    }
+
+    private void AddRequired()
+    {
+        var key = (_newRequired ?? "").Trim();
+        if (key.Length == 0) return;
+        if (_required.Add(key)) _dirty = true;
+        _newRequired = "";
+    }
+
+    private static string ToHex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+
+    private static Color FromHex(string hex)
+    {
+        var h = (hex ?? "").Trim();
+        if (h.StartsWith("#")) h = h[1..];
+        if (h.Length != 6) return Color.Gray;
+
+        try
+        {
+            var r = Convert.ToInt32(h.Substring(0, 2), 16);
+            var g = Convert.ToInt32(h.Substring(2, 2), 16);
+            var b = Convert.ToInt32(h.Substring(4, 2), 16);
+            return Color.FromArgb(r, g, b);
+        }
+        catch
+        {
+            return Color.Gray;
+        }
+    }
+}

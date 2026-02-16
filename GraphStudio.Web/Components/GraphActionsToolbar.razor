@@ -1,0 +1,99 @@
+﻿@rendermode InteractiveServer
+
+@using GraphStudio.Domain
+@using GraphStudio.Domain.CanvasOps
+@using GraphStudio.Web.Services
+@inject GraphSelectionState SelectionState
+@inject GraphInteractionService InteractionService
+@inject IJSRuntime JS
+
+<div class="d-flex gap-2 align-items-center">
+    <button class="btn btn-sm btn-primary" @onclick="AddNode">Add Node</button>
+
+    <button class="btn btn-sm btn-secondary"
+            @onclick="AddEdge"
+            disabled="@(!CanAddEdge)">
+        Add Edge
+    </button>
+
+    <button class="btn btn-sm btn-danger"
+            @onclick="DeleteSelected"
+            disabled="@(!HasSelection)">
+        Delete
+    </button>
+
+    <button class="btn btn-sm btn-outline-secondary" @onclick="Fit">Fit</button>
+    <button class="btn btn-sm btn-outline-secondary" @onclick="SaveToJson">Save</button>
+</div>
+
+@code {
+    [Parameter] public Guid DocumentId { get; set; }
+
+    private bool HasSingleSelection => SelectionState.SelectedElements.Count == 1;
+    private bool CanAddEdge => InteractionService.SelectedNodeIds.Count == 2;
+    private bool HasSelection => SelectionState.SelectedElements.Count > 0;
+
+    protected override void OnInitialized()
+        => SelectionState.Changed += StateHasChanged;
+
+    public void Dispose()
+        => SelectionState.Changed -= StateHasChanged;
+
+    private async Task AddNode()
+    {
+        var nodeId = Guid.NewGuid();
+        // For now: drop at a fixed spot. Next upgrade: use viewport center.
+        var op = new AddNodeOp(
+			NodeId: nodeId.ToString(),
+			NodeTypeId: InteractionService.TryGetSchema()?.DefaultNodeType.Id.ToString() ?? throw new InvalidOperationException("No default node type defined in schema"),
+            NodeTypeName: InteractionService.TryGetSchema()?.DefaultNodeType.Name ?? throw new InvalidOperationException("No default node type defined in schema"),
+            X: 200,
+            Y: 200,
+			Label: InteractionService.TryGetSchema()?.DefaultNodeType.Name ?? "Node"
+        );
+
+        await InteractionService.SubmitLocalOpsAsync(new AddNodeOp[] { op });
+		// InteractionService.SetSelectedNodeIds(new[] { nodeId.ToString() });
+    }
+
+    private async Task AddEdge()
+    {
+        // Minimal UX: uses the two currently selected nodes
+        var nodes = InteractionService.SelectedNodeIds;
+        if (nodes.Count != 2) return;
+
+        var op = new AddEdgeOp(
+            EdgeId: Guid.NewGuid().ToString(),
+            FromNodeId: nodes[0],
+            ToNodeId: nodes[1],
+            EdgeTypeId: InteractionService.TryGetSchema()?.DefaultEdgeType.Id.ToString() ?? throw new InvalidOperationException("No default edge type defined in schema"),
+            RelType: InteractionService.TryGetSchema()?.DefaultEdgeType.Name ?? throw new InvalidOperationException("No default edge type defined in schema"),
+            Directed: true,
+            Label: InteractionService.TryGetSchema()?.DefaultEdgeType.Name ?? throw new InvalidOperationException("No default edge type defined in schema")
+        );
+
+        await InteractionService.SubmitLocalOpsAsync(new CanvasOp[] { op });
+    }
+
+    private async Task DeleteSelected()
+    {
+        await InteractionService.DeleteSelectionAsync();
+    }
+
+    private async Task Fit()
+    {
+        await InteractionService.FitAsync();
+    }
+
+    private async Task SaveToJson()
+    {
+		FileInfo? exportFile = InteractionService.ExportCurrentDocumentToJsonFile();
+        if (exportFile is not null)
+        {
+            var json = await File.ReadAllTextAsync(exportFile.FullName);
+			var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            var fileName = $"graph_export_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+			await JS.InvokeVoidAsync("downloadFile", Convert.ToBase64String(bytes), fileName);
+        }
+	}
+}

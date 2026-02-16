@@ -1,0 +1,215 @@
+﻿@rendermode InteractiveServer
+@implements IDisposable
+
+@using GraphStudio.Domain
+@using GraphStudio.Domain.SchemaOps
+@using GraphStudio.Web.Services
+@using System.Text.Json
+@inject GraphInteractionService Interaction
+
+<div class="p-2 border rounded" style="min-width: 360px;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="fw-semibold">Schema</div>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Reload">Reload</button>
+    </div>
+
+    @if (_schema is null)
+    {
+        <div class="text-muted">No schema loaded</div>
+    }
+    else
+    {
+        <div class="mb-2">
+            <div class="small text-muted">Name</div>
+            <div class="fw-semibold">@_schema.Name</div>
+            <div class="small text-muted">@_schema.Description</div>
+        </div>
+
+        <hr />
+
+        <div class="d-flex gap-2 mb-2">
+            <button class="btn btn-sm btn-primary" @onclick="AddNodeType">+ Node Type</button>
+            <button class="btn btn-sm btn-primary" @onclick="AddEdgeType">+ Edge Type</button>
+        </div>
+
+        <div class="row g-2">
+            <div class="col-5">
+                <div class="fw-semibold mb-1">Node Types</div>
+                <div class="list-group">
+                    @foreach (var nt in _schema.NodeTypes)
+                    {
+                        var active = nt.Id == _selectedNodeTypeId;
+                        <button type="button"
+                                class="list-group-item list-group-item-action @(active ? "active" : "")"
+                                @onclick="() => SelectNodeType(nt.Id)">
+                            @nt.Name
+                        </button>
+                    }
+                </div>
+
+                <div class="fw-semibold mt-3 mb-1">Edge Types</div>
+                <div class="list-group">
+                    @foreach (var et in _schema.EdgeTypes)
+                    {
+                        var active = et.Id == _selectedEdgeTypeId;
+                        <button type="button"
+                                class="list-group-item list-group-item-action @(active ? "active" : "")"
+                                @onclick="() => SelectEdgeType(et.Id)">
+                            @et.Name
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div class="col-7">
+                @if (_selectedNodeType is not null)
+                {
+                    <NodeTypeEditor NodeType="_selectedNodeType"
+                                    IsDefault="@(_schema.DefaultNodeType.Id == _selectedNodeType.Id)"
+                                    OnMakeDefault="MakeDefaultNodeType"
+                                    OnSave="SaveNodeType"
+                                    OnDelete="DeleteNodeType" />
+                }
+                else if (_selectedEdgeType is not null)
+                {
+                    <EdgeTypeEditor EdgeType="_selectedEdgeType"
+                                    IsDefault="@(_schema.DefaultEdgeType.Id == _selectedEdgeType.Id)"
+                                    OnMakeDefault="MakeDefaultEdgeType"
+                                    OnSave="SaveEdgeType"
+                                    OnDelete="DeleteEdgeType" />
+                }
+                else
+                {
+                    <div class="text-muted">Select a node type or edge type</div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private SchemaDefinition? _schema;
+
+    private Guid? _selectedNodeTypeId;
+    private Guid? _selectedEdgeTypeId;
+
+    private NodeType? _selectedNodeType;
+    private EdgeType? _selectedEdgeType;
+
+    protected override void OnInitialized()
+    {
+        Interaction.Changed += OnChanged;
+        Load();
+    }
+
+    private void OnChanged()
+    => _ = InvokeAsync(() =>
+    {
+        Load(keepSelection: true);
+        StateHasChanged();
+    });
+
+    private void Load(bool keepSelection = false)
+    {
+        _schema = Interaction.TryGetSchema();
+
+        if (_schema is null)
+        {
+            _selectedNodeTypeId = null;
+            _selectedEdgeTypeId = null;
+            _selectedNodeType = null;
+            _selectedEdgeType = null;
+            return;
+        }
+
+        if (!keepSelection)
+        {
+            _selectedNodeTypeId = _schema.NodeTypes.FirstOrDefault()?.Id;
+            _selectedEdgeTypeId = null;
+        }
+
+        // Re-resolve selected objects from schema (avoid stale refs)
+        _selectedNodeType = _selectedNodeTypeId is Guid nid
+            ? _schema.NodeTypes.FirstOrDefault(x => x.Id == nid)
+            : null;
+
+        _selectedEdgeType = _selectedEdgeTypeId is Guid eid
+            ? _schema.EdgeTypes.FirstOrDefault(x => x.Id == eid)
+            : null;
+
+        // If both are set, prefer node type
+        if (_selectedNodeType is not null)
+            _selectedEdgeType = null;
+    }
+
+    private void Reload() => Load(keepSelection: true);
+
+    private void SelectNodeType(Guid id)
+    {
+        _selectedNodeTypeId = id;
+        _selectedEdgeTypeId = null;
+        Load(keepSelection: true);
+    }
+
+    private void SelectEdgeType(Guid id)
+    {
+        _selectedEdgeTypeId = id;
+        _selectedNodeTypeId = null;
+        Load(keepSelection: true);
+    }
+
+    private async Task AddNodeType()
+    {
+		var newId = Guid.NewGuid();
+        var op = new AddNodeTypeOp(
+            new NodeType(
+            Id: newId,
+            Name: "NewNodeType",
+            Description: "",
+            AllowedProperties: [],
+            RequiredProperties: [],
+            DefaultProperties: new Dictionary<string, JsonElement>(),
+            Style: GraphDefaults.GetDefaultNodeStyle())
+        );
+        await Interaction.SubmitSchemaOpsAsync(new[] { op });
+
+        // Select the new one after refresh
+        _selectedNodeTypeId = newId;
+        _selectedEdgeTypeId = null;
+    }
+
+    private async Task AddEdgeType()
+    {
+        var newId = Guid.NewGuid();
+        var op = new AddEdgeTypeOp(new EdgeType(
+            Id: newId,
+            Name: "NewEdgeType",
+            DefaultLabel: "REL",
+            IsWeighted: false,
+            IsDirected: true,
+            AllowedProperties: new HashSet<string>(),
+            RequiredProperties: new HashSet<string>(),
+            Properties: new Dictionary<string, JsonElement>(),
+            Style: GraphDefaults.GetDefaultEdgeStyle()
+        ));
+
+        await Interaction.SubmitSchemaOpsAsync(new[] { op });
+
+        // Select the new one after refresh
+        _selectedEdgeTypeId = newId;
+        _selectedNodeTypeId = null;
+    }
+
+    private Task SaveNodeType(NodeType updated) => Interaction.SubmitSchemaOpsAsync(new[] { new UpdateNodeTypeOp(updated) } );
+    private Task DeleteNodeType(Guid nodeTypeId) => Interaction.SubmitSchemaOpsAsync(new[] { new DeleteNodeTypeOp(nodeTypeId) });
+    private Task MakeDefaultNodeType(Guid nodeTypeId) => Interaction.SubmitSchemaOpsAsync(new[] { new SetDefaultNodeTypeOp(nodeTypeId) });
+
+    private Task SaveEdgeType(EdgeType updated) => Interaction.SubmitSchemaOpsAsync(new[] { new UpdateEdgeTypeOp(updated) });
+    private Task DeleteEdgeType(Guid edgeTypeId) => Interaction.SubmitSchemaOpsAsync(new[] { new DeleteEdgeTypeOp(edgeTypeId) });
+    private Task MakeDefaultEdgeType(Guid edgeTypeId) => Interaction.SubmitSchemaOpsAsync(new[] { new SetDefaultEdgeTypeOp(edgeTypeId) });
+
+    public void Dispose()
+    {
+        Interaction.Changed -= OnChanged;
+    }
+}

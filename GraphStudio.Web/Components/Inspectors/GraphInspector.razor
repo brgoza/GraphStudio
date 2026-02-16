@@ -1,0 +1,48 @@
+﻿@rendermode InteractiveServer
+
+@using System.Text.Json
+@using GraphStudio.Web.Services
+@inject GraphSelectionState SelectionState
+@inject GraphInteractionService Interaction
+<div class="small text-muted">
+    @DateTime.Now.ToLongTimeString()
+</div>
+<div class="p-2 border rounded" style="min-width: 320px;">
+	@if (SelectionState.SelectedElements.Count == 0)
+    {
+        <div class="text-muted">Nothing selected</div>
+    }
+    else if (SelectionState.SelectedElements.Count == 1
+        && SelectionState.SelectedElements[0].Group  == "nodes")
+    {
+        <NodeInspector NodeId="@SelectionState.SelectedElements[0].Id" />
+    }
+    else if (SelectionState.SelectedElements.Count == 1
+        && SelectionState.SelectedElements[0].Group == "edges")
+    {
+        <EdgeInspector EdgeId="@SelectionState.SelectedElements[0].Id" />
+    }
+    else if (SelectionState.SelectedElements.Count > 1)
+    {
+		<div class="text-muted">Multiple elements selected</div>
+    }   
+    else
+    {
+        <div class="text-muted">Unknown selection</div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        SelectionState.Changed += OnSelectionChanged;
+    }
+
+    private void OnSelectionChanged()
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        SelectionState.Changed -= OnSelectionChanged;
+    }
+}

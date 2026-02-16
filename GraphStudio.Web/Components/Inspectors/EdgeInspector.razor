@@ -1,0 +1,60 @@
+﻿@rendermode InteractiveServer
+
+@using System.Text.Json
+@using GraphStudio.Domain.CanvasOps
+@using GraphStudio.Web.Services
+@inject GraphInteractionService Interaction
+
+@if (_edge is null)
+{
+    <div class="text-muted">Edge not found</div>
+}
+else
+{
+    <div class="fw-semibold mb-2">Edge</div>
+
+    <div class="mb-2">
+        <label class="form-label">Type</label>
+        <input class="form-control form-control-sm" value="@_edge.Type" disabled />
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">From → To</label>
+        <input class="form-control form-control-sm" value="@($"{_edge.FromNodeId} → {_edge.ToNodeId}")" disabled />
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Label</label>
+        <input class="form-control form-control-sm" @bind="_label" @bind:event="oninput" />
+    </div>
+
+    <button class="btn btn-sm btn-primary" @onclick="SaveLabel">Save</button>
+}
+
+@code {
+    [Parameter, EditorRequired] public string EdgeId { get; set; } = default!;
+
+    private DomainEdgeSnapshot? _edge;
+    private string _label = "";
+
+    protected override void OnParametersSet()
+    {
+        _edge = Interaction.TryGetEdge(EdgeId);
+        if (_edge is null) return;
+
+        _label = _edge.Label ?? _edge.Type;
+    }
+
+    private void SaveLabel()
+    {
+        if (_edge is null) return;
+
+        var props = new Dictionary<string, JsonElement>
+        {
+            ["label"] = JsonSerializer.SerializeToElement(_label)
+        };
+
+        var op = new SetEdgePropsOp(EdgeId, props);
+        _ = Interaction.SubmitLocalOpsAsync(new CanvasOp[] { op });
+    }
+}

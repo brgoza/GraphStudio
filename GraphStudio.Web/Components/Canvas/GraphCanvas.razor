@@ -1,0 +1,94 @@
+﻿@rendermode InteractiveServer
+@using GraphStudio.Domain
+@using GraphStudio.Domain.CanvasOps
+@using GraphStudio.Web.Services
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject GraphSelectionState GraphSelectionState
+@inject GraphInteractionService GraphInteractionService
+@implements IAsyncDisposable
+
+@* <div @ref="_host" style="width:100%;height:100%;"></div> *@
+<div @ref="_host" style="width:100%;height:600px;border:1px solid #ccc;"></div>
+
+@code {
+
+	[Parameter] public Action<IReadOnlyList<(string Id, string Group)>>? OnSelectionChanged { get; set; }
+	[Parameter] public Action<NodePosition>? OnCanvasContextMenu { get; set; }
+
+	private ElementReference _host;
+	private CyGraphInterop? _cy;
+	private CyGraphCallbacks? _callbacks;
+	private readonly TaskCompletionSource _readyTcs =
+	new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+	public Task WhenReady => _readyTcs.Task;
+
+	public Task ApplyOpsFromUiAsync(IReadOnlyList<CanvasOp> ops) => ApplyOpsAsync(ops);
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (!firstRender) return;
+
+		_callbacks = new CyGraphCallbacks(
+			onSelection: selected =>
+			{
+				if (selected is null || selected.Count == 0)
+				{
+					GraphSelectionState.Clear();
+				}
+				else
+					GraphInteractionService?.OnSelectionChanged(selected);
+			},
+			onMoves: moves => { /* emit MoveNodes op to server */ },
+			onDelete: selected => { /* emit delete ops */ },
+			onCanvasContextMenu: position =>  GraphInteractionService.OnCanvasContextMenu(position)
+		);
+
+		_cy = new CyGraphInterop(JS);
+		var options = new CyOptions();
+		
+		await _cy.InitializeAsync(_host, _callbacks, options);
+		_readyTcs.TrySetResult();
+	}
+
+	public async Task ApplyOpsAsync(IReadOnlyList<CanvasOp> ops)
+	{
+		if (_cy is null)
+			return;
+
+		await WhenReady; // your ready TCS
+
+		try
+		{
+			await _cy.ApplyOpsAsync(ops);
+		}
+		catch (TaskCanceledException)
+		{
+			// Blazor circuit or JS call canceled (refresh/reconnect/dispose). Safe to ignore.
+		}
+		catch (JSDisconnectedException)
+		{
+			// Client disconnected mid-call. Safe to ignore.
+		}
+		catch (ObjectDisposedException)
+		{
+			// Component/interop disposed mid-call. Safe to ignore.
+		}
+	}
+	public async Task FitAsync()
+	{
+		if (_cy is null) return;
+		await _cy.FitAsync();
+	}
+	public async Task SetStyleAsync(object style)
+	{
+		if (_cy is null) return;
+		await _cy.SetStyleAsync(style);
+	}
+	
+	public async ValueTask DisposeAsync()
+	{
+		if (_cy is not null) await _cy.DisposeAsync();
+	}
+}

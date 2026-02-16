@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="GraphStudio.Domain/GraphStudio.Domain.csproj" />
+  <Project Path="GraphStudio.Persistance/GraphStudio.Persistance.csproj" Id="6ed6c809-a41d-462c-a7f8-10c5e2c8e984" />
+  <Project Path="GraphStudio.Web/GraphStudio.Web.csproj" />
+</Solution>

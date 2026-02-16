@@ -1,0 +1,122 @@
+﻿@rendermode InteractiveServer
+
+@using System.Text.Json
+@using GraphStudio.Domain.CanvasOps
+@using GraphStudio.Web.Services
+@inject GraphInteractionService Interaction
+
+@if (_node is null)
+{
+    <div class="text-muted">Node not found</div>
+}
+else
+{
+    <div class="fw-semibold mb-2">Node</div>
+
+    <div class="mb-2">
+        <label class="form-label">Type</label>
+        <input class="form-control form-control-sm" value="@_node.Type" disabled />
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Label</label>
+        <input class="form-control form-control-sm"
+               @bind="_label"
+               @bind:event="oninput"
+               @bind:after="MarkDirty" />
+    </div>
+
+    <div class="mb-2 d-flex gap-2">
+        <button class="btn btn-sm btn-primary" @onclick="SaveLabel" disabled="@(!_dirty)">Save</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Revert" disabled="@(!_dirty)">Revert</button>
+    </div>
+
+    <hr />
+
+    <div class="fw-semibold mb-2">Properties</div>
+
+    @foreach (var kvp in _props)
+    {
+        <div class="mb-2">
+            <label class="form-label">@kvp.Key</label>
+            <input class="form-control form-control-sm"
+                   value="@kvp.Value"
+                   @oninput="e => OnPropEdited(kvp.Key, e.Value?.ToString())" />
+        </div>
+    }
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-primary" @onclick="SaveProps" disabled="@(!_propsDirty)">Save Props</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Reload">Reload</button>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string NodeId { get; set; } = default!;
+
+    private DomainNodeSnapshot? _node;
+    private string _label = "";
+    private bool _dirty;
+
+    private Dictionary<string, string?> _props = new();
+    private bool _propsDirty;
+
+    protected override void OnParametersSet()
+    {
+        _node = Interaction.TryGetNode(NodeId);
+        if (_node is null) return;
+
+        _label = _node.Label ?? _node.Type;
+        _dirty = false;
+
+        _props = _node.Properties.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.ValueKind == JsonValueKind.String ? kvp.Value.GetString()
+                 : kvp.Value.ValueKind == JsonValueKind.Number ? kvp.Value.ToString()
+                 : kvp.Value.ValueKind is JsonValueKind.True or JsonValueKind.False ? kvp.Value.GetBoolean().ToString()
+                 : kvp.Value.ToString());
+
+        _propsDirty = false;
+    }
+
+    private void SaveLabel()
+    {
+        if (_node is null) return;
+       
+        var op = new SetNodeLabelOp(NodeId, _label);
+        _ = Interaction.SubmitLocalOpsAsync(new CanvasOp[] { op });
+        _dirty = false;
+    }
+
+    private void Revert()
+    {
+        if (_node is null) return;
+        _label = _node.Label ?? _node.Type;
+        _dirty = false;
+    }
+
+    private void OnPropEdited(string key, string? value)
+    {
+        _props[key] = value;
+        _propsDirty = true;
+    }
+
+    private void SaveProps()
+    {
+        if (_node is null) return;
+
+        var props = new Dictionary<string, JsonElement>();
+        foreach (var kvp in _props)
+        {
+            props[kvp.Key] = JsonSerializer.SerializeToElement(kvp.Value);
+        }
+
+        var op = new SetNodePropsOp(NodeId, props);
+        _ = Interaction.SubmitLocalOpsAsync(new CanvasOp[] { op });
+        _propsDirty = false;
+    }
+
+    private void Reload() => OnParametersSet();
+
+    private void MarkDirty() => _dirty = true;
+}

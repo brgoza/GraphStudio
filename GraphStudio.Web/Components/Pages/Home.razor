@@ -1,0 +1,31 @@
+﻿@rendermode InteractiveServer
+
+@page "/"
+@using GraphStudio.Web.Components.Canvas
+@using GraphStudio.Web.Components.Inspectors
+@using GraphStudio.Web.Services
+@inject GraphInteractionService Interaction
+
+<div class="d-flex" style="height: 85vh;">
+    <div class="flex-grow-1 d-flex flex-column">
+        <GraphActionsToolbar DocumentId="@_docId" />
+        <div class="flex-grow-1 mt-2">
+            <GraphCanvas @ref="_canvas" />
+        </div>
+    </div>
+
+    <div class="ms-2" style="width: 360px;">
+        <GraphInspector />
+    </div>
+</div>
+
+@code {
+    private readonly Guid _docId = Guid.NewGuid();
+    private GraphCanvas? _canvas;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _canvas is null) return;
+        await Interaction.AttachAsync(_docId, _canvas);
+    }
+}

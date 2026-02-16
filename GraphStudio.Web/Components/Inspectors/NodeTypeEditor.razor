@@ -1,0 +1,230 @@
+﻿@rendermode InteractiveServer
+@using System.Drawing
+@using GraphStudio.Domain
+@using System.Text.Json
+
+<div class="p-2 border rounded">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="fw-semibold">Node Type</div>
+        <div class="d-flex gap-2">
+            @if (!IsDefault)
+            {
+                <button class="btn btn-sm btn-outline-primary" @onclick="() => OnMakeDefault.InvokeAsync(_draft.Id)">
+                    Make Default
+                </button>
+            }
+            <button class="btn btn-sm btn-danger" @onclick="Delete">Delete</button>
+        </div>
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Name</label>
+        <input class="form-control form-control-sm" @bind="_draftName" @bind:event="oninput" />
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Description</label>
+        <textarea class="form-control form-control-sm" rows="2" @bind="_draftDesc"></textarea>
+    </div>
+
+    <hr />
+
+    <div class="fw-semibold mb-1">Style</div>
+
+    <div class="row g-2 mb-2">
+        <div class="col-6">
+            <label class="form-label">Width</label>
+            <input class="form-control form-control-sm" type="number" @bind="_width" />
+        </div>
+        <div class="col-6">
+            <label class="form-label">Height</label>
+            <input class="form-control form-control-sm" type="number" @bind="_height" />
+        </div>
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Shape</label>
+        <select class="form-select form-select-sm" @bind="_shape">
+            @foreach (var shape in Enum.GetValues<NodeShape>())
+            {
+                <option value="@shape">@shape</option>
+            }
+        </select>
+    </div>
+
+    <div class="row g-2 mb-2">
+        <div class="col-4">
+            <label class="form-label">Background</label>
+            <input class="form-control form-control-sm" @bind="_bgHex" />
+        </div>
+        <div class="col-4">
+            <label class="form-label">Border</label>
+            <input class="form-control form-control-sm" @bind="_borderHex" />
+        </div>
+        <div class="col-4">
+            <label class="form-label">Text</label>
+            <input class="form-control form-control-sm" @bind="_textHex" />
+        </div>
+    </div>
+
+    <hr />
+
+    <div class="fw-semibold mb-1">Allowed Properties</div>
+    <div class="d-flex gap-2 mb-2">
+        <input class="form-control form-control-sm" placeholder="propertyKey" @bind="_newAllowed" @bind:event="oninput" />
+        <button class="btn btn-sm btn-outline-secondary" @onclick="AddAllowed">Add</button>
+    </div>
+    <ul class="list-group mb-2">
+        @foreach (var p in _allowed.OrderBy(x => x))
+        {
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>@p</span>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveAllowed(p)">x</button>
+            </li>
+        }
+    </ul>
+
+    <div class="fw-semibold mb-1">Required Properties</div>
+    <div class="d-flex gap-2 mb-2">
+        <input class="form-control form-control-sm" placeholder="propertyKey" @bind="_newRequired" @bind:event="oninput" />
+        <button class="btn btn-sm btn-outline-secondary" @onclick="AddRequired">Add</button>
+    </div>
+    <ul class="list-group mb-2">
+        @foreach (var p in _required.OrderBy(x => x))
+        {
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>@p</span>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveRequired(p)">x</button>
+            </li>
+        }
+    </ul>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-primary" @onclick="Save" disabled="@(!_dirty)">Save</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Reset" disabled="@(!_dirty)">Revert</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public NodeType NodeType { get; set; } = default!;
+    [Parameter] public bool IsDefault { get; set; }
+
+    [Parameter, EditorRequired] public EventCallback<Guid> OnMakeDefault { get; set; }
+    [Parameter, EditorRequired] public EventCallback<NodeType> OnSave { get; set; }
+    [Parameter, EditorRequired] public EventCallback<Guid> OnDelete { get; set; }
+
+    private NodeType _draft = default!;
+
+    private string _draftName = "";
+    private string _draftDesc = "";
+
+    private double _width;
+    private double _height;
+    private NodeShape _shape;
+
+    private string _bgHex = "#4f46e5";
+    private string _borderHex = "#111827";
+    private string _textHex = "#ffffff";
+
+    private HashSet<string> _allowed = new();
+    private HashSet<string> _required = new();
+
+    private string _newAllowed = "";
+    private string _newRequired = "";
+    private bool _dirty;
+
+    protected override void OnParametersSet()
+    {
+        _draft = NodeType;
+
+        _draftName = NodeType.Name;
+        _draftDesc = NodeType.Description;
+
+        _width = NodeType.Style.Width;
+        _height = NodeType.Style.Height;
+        _shape = NodeType.Style.Shape;
+
+        _bgHex = ToHex(NodeType.Style.BackgroundColor);
+        _borderHex = ToHex(NodeType.Style.BorderColor);
+        _textHex = ToHex(NodeType.Style.Color);
+
+        _allowed = new HashSet<string>(NodeType.AllowedProperties);
+        _required = new HashSet<string>(NodeType.RequiredProperties);
+
+        _dirty = false;
+    }
+
+    private async Task Save()
+    {
+        var updated = _draft with
+        {
+            Name = _draftName.Trim(),
+            Description = _draftDesc ?? "",
+            AllowedProperties = new HashSet<string>(_allowed),
+            RequiredProperties = new HashSet<string>(_required),
+            Style = new NodeStyle(
+                Width: _width,
+                Height: _height,
+                Shape: _shape,
+                BackgroundColor: FromHex(_bgHex),
+                BorderColor: FromHex(_borderHex),
+                Color: FromHex(_textHex)
+            )
+        };
+
+        await OnSave.InvokeAsync(updated);
+        _dirty = false;
+    }
+
+    private void Reset() => OnParametersSet();
+
+    private async Task Delete() => await OnDelete.InvokeAsync(_draft.Id);
+
+    private void AddAllowed()
+    {
+        var key = (_newAllowed ?? "").Trim();
+        if (key.Length == 0) return;
+        if (_allowed.Add(key)) _dirty = true;
+        _newAllowed = "";
+    }
+
+    private void RemoveAllowed(string key)
+    {
+        if (_allowed.Remove(key)) _dirty = true;
+        // optional: also remove from required if you want strictness
+    }
+
+    private void AddRequired()
+    {
+        var key = (_newRequired ?? "").Trim();
+        if (key.Length == 0) return;
+        if (_required.Add(key)) _dirty = true;
+        _newRequired = "";
+    }
+
+    private void RemoveRequired(string key)
+    {
+        if (_required.Remove(key)) _dirty = true;
+    }
+
+    private static string ToHex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+
+    private static Color FromHex(string hex)
+    {
+        var h = (hex ?? "").Trim();
+        if (h.StartsWith("#")) h = h[1..];
+        if (h.Length != 6) return Color.Black;
+
+        try
+        {
+            var r = Convert.ToInt32(h.Substring(0, 2), 16);
+            var g = Convert.ToInt32(h.Substring(2, 2), 16);
+            var b = Convert.ToInt32(h.Substring(4, 2), 16);
+            return Color.FromArgb(r, g, b);
+        }
+        catch
+        {
+            return Color.Black;
+        }
+    }
+}
