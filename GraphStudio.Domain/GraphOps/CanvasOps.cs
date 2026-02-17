@@ -25,7 +25,7 @@ public sealed record AddNodeOp(
     [property: JsonPropertyName("x")] double X,
     [property: JsonPropertyName("y")] double Y,
     [property: JsonPropertyName("label")] string? Label = null,
-    [property: JsonPropertyName("data")] IReadOnlyDictionary<string, object?>? Data = null,
+    //[property: JsonPropertyName("data")] IReadOnlyDictionary<string, object?>? Data = null,
     [property: JsonPropertyName("classes")] string? Classes = null
 ) : CanvasOp("AddNode");
 

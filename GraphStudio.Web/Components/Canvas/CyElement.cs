@@ -6,7 +6,7 @@ public sealed class CyElement
 {
     [JsonPropertyName("group")]
     public string Group { get; init; } = default!; // "nodes" or "edges"
-
+    
     [JsonPropertyName("data")]
     public Dictionary<string, object?> Data { get; init; } = new();
 

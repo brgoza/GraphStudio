@@ -5,12 +5,12 @@ using System.Text.Json;
 
 namespace GraphStudio.Domain.CanvasOps;
 
-public static class CanvasOpApplier
+public static class GraphDocOpApplioer
 {
-    public static GraphDocument Apply(GraphDocument doc, ICanvasOp op)
+    public static GraphDocument Apply(GraphDocument doc, CanvasOp op)
     {
         string kind = op.Kind;
-
+        Console.WriteLine($"Applying CanvasOp of kind: {kind} to docId: {doc.Id}");
         return op.Kind switch
         {
             "AddNode" => ApplyAddNode(doc, (AddNodeOp)op),
@@ -36,13 +36,14 @@ public static class CanvasOpApplier
     }
     private static GraphDocument ApplyAddNode(GraphDocument doc, AddNodeOp op)
     {
+        Console.WriteLine($"ApplyAddNoe\tGraphDocumentId\t{doc.Id}\t{op.NodeId}");
         var nodeId = Guid.Parse(op.NodeId);
         var nodeTypeId = Guid.Parse(op.NodeTypeId);
         var x = op.X;
         var y = op.Y;
 
         NodeType resolvedNodeType = doc.Schema.NodeTypes.FirstOrDefault(nt => nt.Id == nodeTypeId)
-            ?? GraphDefaults.GetDefaultNodeType();
+            ?? GraphDefaults.CreateNewNodeTypeWithDefaults();
         var newNode = new Node(nodeId,
             resolvedNodeType.Id, resolvedNodeType, op.Label ?? resolvedNodeType.Name, new NodePosition(x, y), new Dictionary<string, JsonElement>());
 
@@ -50,7 +51,7 @@ public static class CanvasOpApplier
         {
             [nodeId] = newNode
         };
-
+        Console.WriteLine($"Finished ApplyAddNode\tGraphDocumentId\t{doc.Id}\t{op.NodeId}");
         return doc with { Nodes = nodes };
     }
 

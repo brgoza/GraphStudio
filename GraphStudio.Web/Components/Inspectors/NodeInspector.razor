@@ -52,7 +52,7 @@ else
 }
 
 @code {
-    [Parameter, EditorRequired] public string NodeId { get; set; } = default!;
+    [Parameter, EditorRequired] public string NodeId { get; set; }
 
     private DomainNodeSnapshot? _node;
     private string _label = "";
@@ -84,7 +84,7 @@ else
         if (_node is null) return;
        
         var op = new SetNodeLabelOp(NodeId, _label);
-        _ = Interaction.SubmitLocalOpsAsync(new CanvasOp[] { op });
+        _ = Interaction.SubmitLocalOpsAsync(new List<SetNodeLabelOp> { op });
         _dirty = false;
     }
 

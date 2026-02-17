@@ -3,7 +3,7 @@
 @using GraphStudio.Domain
 @using GraphStudio.Domain.CanvasOps
 @using GraphStudio.Web.Services
-@inject GraphSelectionState SelectionState
+@inject GraphSelectionService SelectionState
 @inject GraphInteractionService InteractionService
 @inject IJSRuntime JS
 
@@ -27,7 +27,7 @@
 </div>
 
 @code {
-    [Parameter] public Guid DocumentId { get; set; }
+    [Parameter] public Guid? DocumentId { get; set; }
 
     private bool HasSingleSelection => SelectionState.SelectedElements.Count == 1;
     private bool CanAddEdge => InteractionService.SelectedNodeIds.Count == 2;
@@ -52,7 +52,7 @@
 			Label: InteractionService.TryGetSchema()?.DefaultNodeType.Name ?? "Node"
         );
 
-        await InteractionService.SubmitLocalOpsAsync(new AddNodeOp[] { op });
+        await InteractionService.SubmitLocalOpsAsync(new List<AddNodeOp>(){ op });
 		// InteractionService.SetSelectedNodeIds(new[] { nodeId.ToString() });
     }
 
@@ -72,7 +72,7 @@
             Label: InteractionService.TryGetSchema()?.DefaultEdgeType.Name ?? throw new InvalidOperationException("No default edge type defined in schema")
         );
 
-        await InteractionService.SubmitLocalOpsAsync(new CanvasOp[] { op });
+        await InteractionService.SubmitLocalOpsAsync(new List<AddEdgeOp> { op });
     }
 
     private async Task DeleteSelected()

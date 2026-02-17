@@ -11,19 +11,33 @@ namespace GraphStudio.Web.Services;
 
 public sealed class GraphInteractionService
 {
-    private readonly GraphSelectionState _selection;
-    private GraphDocument _doc = GraphDefaults.GetDefaultDocument();
+    private readonly ILogger<GraphInteractionService> _logger;
+
+    private GraphDocument? _doc;
+    private CyGraphInterop? _interop;
     private GraphCanvas? _canvas;
-    private SchemaDefinition? _schema;
+    private GraphDocumentFactory _documentFactory;
+    private readonly GraphSelectionService _selectionService;
 
     public event Action? Changed;
 
-    public SchemaDefinition? TryGetSchema() => _doc.Schema;
-    public GraphInteractionService(GraphSelectionState selection)
+    public SchemaDefinition? TryGetSchema() => _doc?.Schema;
+    public GraphInteractionService(ILogger<GraphInteractionService> logger, GraphDocumentFactory graphDocumentFactory, GraphSelectionService selectionService)
     {
-        _selection = selection;
+        _selectionService = selectionService;
+        _logger = logger;
+        _documentFactory = graphDocumentFactory;
     }
-    public Guid CurrentDocumentId { get; private set; }
+
+    public Task Attach(CyGraphInterop interop, GraphCanvas canvas)
+    {
+        _interop = interop;
+        _canvas = canvas;
+        _doc = _documentFactory.CreateNewDocument();
+        return Task.CompletedTask;
+    }
+
+    public Guid? CurrentDocumentId => _doc?.Id;
     public List<string> SelectedNodeIds { get; } = new();
     public List<string> SelectedEdgeIds { get; } = new();
 
@@ -56,32 +70,30 @@ public sealed class GraphInteractionService
         filename ??= $"graph-{CurrentDocumentId}.json";
         return _doc.SaveDocToJsonFile(filename);
     }
-    public Task AttachAsync(Guid documentId, GraphCanvas canvas)
-    {
-        CurrentDocumentId = documentId;
-        _canvas = canvas;
-        return Task.CompletedTask;
-    }
+
 
     public async Task SubmitLocalOpsAsync(IReadOnlyList<CanvasOp> ops)
     {
         // 1) apply to domain
         foreach (var op in ops)
-            _doc = CanvasOpApplier.Apply(_doc, op);
+        {
+            _logger.LogInformation("Applying op {OpKind} to document {docId}", op.Kind, _doc!.Id);
+            _doc = GraphDocOpApplioer.Apply(_doc!, op);
+        }
 
         // 2) apply to canvas
         if (_canvas is not null)
-            await _canvas.ApplyOpsFromUiAsync(ops.ToArray());
+            await _canvas.ApplyOpsFromUiAsync(ops);
     }
 
     public async Task DeleteSelectionAsync()
     {
-        if (_selection.SelectedElements.IsNullOrEmpty()) return;
+        if (_selectionService.SelectedElements.IsNullOrEmpty()) return;
 
-        var op = new DeleteSelectedOp(_selection.SelectedElements);
+        var op = new DeleteSelectedOp(_selectionService.SelectedElements);
 
-        await SubmitLocalOpsAsync([op]);
-        _selection.Clear();
+        await SubmitLocalOpsAsync(new List<DeleteSelectedOp> { op });
+        _selectionService.Clear();
     }
 
     public Task FitAsync() => _canvas?.FitAsync() ?? Task.CompletedTask;
@@ -91,7 +103,7 @@ public sealed class GraphInteractionService
         if (!Guid.TryParse(nodeId, out var id))
             return null;
 
-        if (!_doc.Nodes.TryGetValue(id, out var node))
+        if (!_doc!.Nodes.TryGetValue(id, out var node))
             return null;
 
         return new DomainNodeSnapshot(
@@ -123,28 +135,24 @@ public sealed class GraphInteractionService
         );
     }
 
-    public void SetSelectedNodeIds(IEnumerable<string> nodeIds)
-    {
-        SelectedNodeIds.Clear();
-        SelectedNodeIds.AddRange(nodeIds);
-        Changed?.Invoke();
-    }
 
     // Call this from GraphCanvas selection callback:
     public void OnSelectionChanged(IReadOnlyList<SelectedElementDto> selected)
     {
+        _logger.LogInformation("doc nodes: {nodes}", string.Join(',', _doc.Nodes.Select(n => n.Key)));
         SelectedNodeIds.Clear();
+        SelectedEdgeIds.Clear();
         foreach (var s in selected)
         {
             if (s.Group == "edges") SelectedEdgeIds.Add(s.Id);
             if (s.Group == "nodes") SelectedNodeIds.Add(s.Id);
         }
-        _selection.SetSelection(selected.ToList());
+        _selectionService.SetSelection(selected.ToList());
     }
     public void OnSelectionCleared()
     {
         SelectedNodeIds.Clear();
-        _selection.Clear();
+        _selectionService.Clear();
     }
     public void OnCanvasContextMenu(NodePosition position)
     {

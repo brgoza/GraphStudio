@@ -1,9 +1,10 @@
 ﻿using GraphStudio.Domain.CanvasOps;
+using GraphStudio.Web.Components.Canvas;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
-namespace GraphStudio.Web.Services; 
+namespace GraphStudio.Web.Services;
 
 public sealed class CyGraphInterop : IAsyncDisposable
 {
@@ -12,9 +13,13 @@ public sealed class CyGraphInterop : IAsyncDisposable
     private DotNetObjectReference<CyGraphCallbacks>? _dotNetRef;
     private string? _handleId;
 
-    public CyGraphInterop(IJSRuntime js) => _js = js;
+    public CyGraphInterop(IJSRuntime js)
+    {
+        _js = js;
+    }
 
     public async Task InitializeAsync(
+        GraphCanvas canvas,
         ElementReference hostElement,
         CyGraphCallbacks callbacks,
         object options)
@@ -25,11 +30,11 @@ public sealed class CyGraphInterop : IAsyncDisposable
         _handleId = await _module.InvokeAsync<string>(
             "create", hostElement, _dotNetRef, options);
     }
-    public ValueTask ApplyOpsAsync(IReadOnlyCollection<CanvasOp> ops) =>
-        _module!.InvokeVoidAsync("applyOps", _handleId, ops);
-
-    //public ValueTask ApplyOpsAsync(IReadOnlyList<object> ops) =>
+    //public ValueTask ApplyOpsAsync(object ops) =>
     //    _module!.InvokeVoidAsync("applyOps", _handleId, ops);
+
+    public async ValueTask ApplyOpsAsync(IReadOnlyList<object> ops) =>
+         _module!.InvokeVoidAsync("applyOps", _handleId, ops);
 
     public ValueTask SetStyleAsync(object style) =>
         _module!.InvokeVoidAsync("setStyle", _handleId, style);

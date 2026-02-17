@@ -4,7 +4,7 @@ using GraphStudio.Domain.CanvasOps;
 
 namespace GraphStudio.Web.Services;
 
-public sealed class GraphSelectionState
+public sealed class GraphSelectionService
 {
     public event Action? Changed;
 

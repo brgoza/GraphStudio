@@ -47,10 +47,9 @@ public class Program
 
         builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
-        builder.Services.AddScoped<GraphState>();
-        builder.Services.AddScoped<GraphSelectionState>();
+        builder.Services.AddScoped<GraphSelectionService>();
         builder.Services.AddScoped<GraphInteractionService>();
-
+        builder.Services.AddSingleton<GraphDocumentFactory>();
 
         var app = builder.Build();
 
