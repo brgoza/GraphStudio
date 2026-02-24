@@ -18,6 +18,7 @@ public static class GraphDocOpApplioer
             "DeleteSelected" => ApplyDeleteSelected(doc, (DeleteSelectedOp)op),
             "SetNodeProps" => ApplySetNodeProps(doc, (SetNodePropsOp)op),
             "SetNodeLabel" => ApplySetNodeLabel(doc, (SetNodeLabelOp)op),
+            "SwapEdgeEndpoints" => ApplySwapEdgeEndpoints(doc, (SwapEdgeEndpointsOp)op),
             _ => doc
         };
     }
@@ -140,6 +141,22 @@ public static class GraphDocOpApplioer
 
         return doc with { Nodes = nodes };
     }
-
+    private static GraphDocument ApplySwapEdgeEndpoints(GraphDocument doc, SwapEdgeEndpointsOp op)
+    {
+        if (!Guid.TryParse(op.EdgeId, out var edgeId))
+            return doc;
+        if (!doc.Edges.TryGetValue(edgeId, out var edge))
+            return doc;
+        var swappedEdge = edge with
+        {
+            FromNodeId = edge.ToNodeId,
+            ToNodeId = edge.FromNodeId
+        };
+        var edges = new Dictionary<Guid, Edge>(doc.Edges)
+        {
+            [edgeId] = swappedEdge
+        };
+        return doc with { Edges = edges };
+    }
 
 }

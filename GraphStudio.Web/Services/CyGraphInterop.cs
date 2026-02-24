@@ -34,7 +34,7 @@ public sealed class CyGraphInterop : IAsyncDisposable
     //    _module!.InvokeVoidAsync("applyOps", _handleId, ops);
 
     public async ValueTask ApplyOpsAsync(IReadOnlyList<object> ops) =>
-         _module!.InvokeVoidAsync("applyOps", _handleId, ops);
+      await   _module!.InvokeVoidAsync("applyOps", _handleId, ops);
 
     public ValueTask SetStyleAsync(object style) =>
         _module!.InvokeVoidAsync("setStyle", _handleId, style);
@@ -45,8 +45,8 @@ public sealed class CyGraphInterop : IAsyncDisposable
     public ValueTask FitAsync(int padding = 30) =>
         _module!.InvokeVoidAsync("fit", _handleId, padding);
 
-    public ValueTask<object?> GetViewportAsync() =>
-        _module!.InvokeAsync<object?>("getViewport", _handleId);
+    public ValueTask<CyViewport> GetViewportAsync() =>
+        _module!.InvokeAsync<CyViewport>("getViewport", _handleId);
 
     public async ValueTask DisposeAsync()
     {

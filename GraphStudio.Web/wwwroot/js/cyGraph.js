@@ -153,6 +153,13 @@ function opApply(cy, op)
 			cy.getElementById(op.edgeId).remove();
 			return;
 		}
+		case "SwapEdgeEndpoints": {
+			const e = cy.getElementById(op.edgeId);
+            const nodeA = e.source().id();
+            const nodeB = e.target().id();
+            e.source(nodeB);
+            e.target(nodeA);
+		}
 		case "SetEdgeProps": {
 			const e = cy.getElementById(op.edgeId);
 			if (e.empty()) return;

@@ -67,6 +67,10 @@ public sealed record AddEdgeOp(
     [property: JsonPropertyName("classes")] string? Classes = null
 ) : CanvasOp("AddEdge");
 
+public sealed record SwapEdgeEndpointsOp(
+    [property: JsonPropertyName("edgeId")] string EdgeId
+) : CanvasOp("SwapEdgeEndpoints");
+
 public sealed record RemoveEdgeOp(
     [property: JsonPropertyName("edgeId")] string EdgeId
 ) : CanvasOp("RemoveEdge");
