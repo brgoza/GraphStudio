@@ -21,6 +21,7 @@ else
     <div class="mb-2">
         <label class="form-label">From → To</label>
         <input class="form-control form-control-sm" value="@($"{_edge.FromNodeId} → {_edge.ToNodeId}")" disabled />
+        <button class="btn btn-sm btn-primary" @onclick="SwapEndpoints">Swap</button>
     </div>
 
     <div class="mb-2">
@@ -44,7 +45,12 @@ else
 
         _label = _edge.Label ?? _edge.Type;
     }
-
+    private void SwapEndpoints()
+    {
+        if (_edge is null) return;
+        var op = new SwapEdgeEndpointsOp(EdgeId);
+        _ = Interaction.SubmitLocalOpsAsync(new List<SwapEdgeEndpointsOp> { op });
+    }
     private void SaveLabel()
     {
         if (_edge is null) return;

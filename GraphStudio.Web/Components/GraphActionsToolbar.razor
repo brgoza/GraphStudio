@@ -2,6 +2,7 @@
 
 @using GraphStudio.Domain
 @using GraphStudio.Domain.CanvasOps
+@using GraphStudio.Web.Components.Canvas
 @using GraphStudio.Web.Services
 @inject GraphSelectionService SelectionState
 @inject GraphInteractionService InteractionService
@@ -42,13 +43,14 @@
     private async Task AddNode()
     {
         var nodeId = Guid.NewGuid();
+        NodePosition pos = await InteractionService.GetViewportCenterAsync();
         // For now: drop at a fixed spot. Next upgrade: use viewport center.
         var op = new AddNodeOp(
 			NodeId: nodeId.ToString(),
 			NodeTypeId: InteractionService.TryGetSchema()?.DefaultNodeType.Id.ToString() ?? throw new InvalidOperationException("No default node type defined in schema"),
             NodeTypeName: InteractionService.TryGetSchema()?.DefaultNodeType.Name ?? throw new InvalidOperationException("No default node type defined in schema"),
-            X: 200,
-            Y: 200,
+            X: pos.X,
+            Y: pos.Y,
 			Label: InteractionService.TryGetSchema()?.DefaultNodeType.Name ?? "Node"
         );
 

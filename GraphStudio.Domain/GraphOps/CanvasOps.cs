@@ -66,6 +66,9 @@ public sealed record AddEdgeOp(
     [property: JsonPropertyName("data")] IReadOnlyDictionary<string, object?>? Data = null,
     [property: JsonPropertyName("classes")] string? Classes = null
 ) : CanvasOp("AddEdge");
+public sealed record SwapEdgeEndpointsOp(
+    [property: JsonPropertyName("edgeId")] string EdgeId
+) : CanvasOp("SwapEdgeEndpoints");
 
 public sealed record RemoveEdgeOp(
     [property: JsonPropertyName("edgeId")] string EdgeId

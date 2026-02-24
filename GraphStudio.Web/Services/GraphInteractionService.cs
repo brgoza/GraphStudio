@@ -36,7 +36,13 @@ public sealed class GraphInteractionService
         _doc = _documentFactory.CreateNewDocument();
         return Task.CompletedTask;
     }
-
+    public async Task<NodePosition> GetViewportCenterAsync()
+    {
+        if (_canvas is null)
+            return new NodePosition(0, 0);
+        CyViewport vp = await _interop.GetViewportAsync();
+        return new NodePosition(vp.PanX + vp.Zoom * 0.5, vp.PanY + vp.Zoom * 0.5);
+    }
     public Guid? CurrentDocumentId => _doc?.Id;
     public List<string> SelectedNodeIds { get; } = new();
     public List<string> SelectedEdgeIds { get; } = new();
