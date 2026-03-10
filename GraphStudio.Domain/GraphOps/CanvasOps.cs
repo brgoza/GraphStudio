@@ -70,9 +70,7 @@ public sealed record SwapEdgeEndpointsOp(
     [property: JsonPropertyName("edgeId")] string EdgeId
 ) : CanvasOp("SwapEdgeEndpoints");
 
-public sealed record SwapEdgeEndpointsOp(
-    [property: JsonPropertyName("edgeId")] string EdgeId
-) : CanvasOp("SwapEdgeEndpoints");
+
 
 public sealed record RemoveEdgeOp(
     [property: JsonPropertyName("edgeId")] string EdgeId

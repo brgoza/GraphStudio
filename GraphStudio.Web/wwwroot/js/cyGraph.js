@@ -78,8 +78,6 @@ function normalizeElements(elements)
 
 function opApply(cy, op)
 {
-	console.log(op);
-	console.log(op.nodeId);
 	switch (op.kind)
 	{
 		case "AddNode": {
@@ -116,6 +114,7 @@ function opApply(cy, op)
 			console.log("SetNodeLabel entered");
 			console.log("setting node label",op, op.nodeId, op.label)
 			const n = cy.getElementById(op.nodeId);
+			console.log("canvas node:", n);
 			if (n.empty()) return;
 			n.data("label", op.label);
 			console.log("success");
@@ -156,7 +155,9 @@ function opApply(cy, op)
 		case "SwapEdgeEndpoints": {
 			const e = cy.getElementById(op.edgeId);
             const nodeA = e.source().id();
-            const nodeB = e.target().id();
+			const nodeB = e.target().id();
+			console.log("SwapEdgeEndpoints entered", op, e, nodeA, nodeB);
+
             e.source(nodeB);
             e.target(nodeA);
 		}
